@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Problem Details - Problem Solving Platform</title>
+    <link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <nav class="navbar">
+                <a href="/" class="logo">💡 Problem Solver</a>
+                <ul class="nav-links" id="authLinks"></ul>
+                <button class="theme-toggle" id="themeToggle">🌙</button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container" style="max-width: 900px; margin-top: 2rem;">
+        <div id="problemContainer">
+            <div class="loading"><div class="spinner"></div></div>
+        </div>
+
+        <div id="commentsSection" style="margin-top: 3rem;">
+            <h2>Discussion</h2>
+            <div id="commentsContainer"></div>
+
+            <div id="commentForm" style="display: none; margin-top: 2rem; background-color: var(--bg-secondary); padding: 1.5rem; border-radius: 0.5rem; border: 1px solid var(--border-color);">
+                <h3>Add a Comment</h3>
+                <textarea
+                    id="commentContent"
+                    class="form-textarea"
+                    placeholder="Share your thoughts, ask questions, or provide additional insights..."
+                    style="margin-top: 1rem;"
+                ></textarea>
+                <button class="btn btn-primary" id="submitComment" style="margin-top: 1rem;">Post Comment</button>
+            </div>
+
+            <p id="loginPrompt" style="display: none; text-align: center; margin-top: 2rem; color: var(--text-secondary);">
+                <a href="/login" style="color: var(--primary-color);">Login</a> to add comments
+            </p>
+        </div>
+    </main>
+
+    <script src="/js/theme.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/utils.js"></script>
+    <script>
+        // Theme toggle
+        document.getElementById('themeToggle').addEventListener('click', () => {
+            themeManager.toggle();
+        });
+
+        // Get problem ID from URL
+        const pathParts = window.location.pathname.split('/');
+        const problemId = pathParts[pathParts.length - 1];
+
+        // Load problem details
+        async function loadProblem() {
+            try {
+                const data = await API.getProblem(problemId);
+
+                if (data.success && data.problem) {
+                    const problem = data.problem;
+                    const tags = problem.tags ? problem.tags.split(',').map(tag =>
+                        `<span class="tag">${escapeHtml(tag.trim())}</span>`
+                    ).join('') : '';
+
+                    const container = document.getElementById('problemContainer');
+                    container.innerHTML = `
+                        <div style="background-color: var(--bg-secondary); padding: 2rem; border-radius: 0.5rem; border: 1px solid var(--border-color);">
+                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
+                                <h1 style="flex: 1;">${escapeHtml(problem.title)}</h1>
+                                <span class="category-badge">${escapeHtml(problem.category)}</span>
+                            </div>
+
+                            <div class="problem-meta" style="margin-bottom: 2rem;">
+                                <span>Posted by ${escapeHtml(problem.full_name || problem.username)}</span>
+                                <span>${formatDate(problem.created_at)}</span>
+                                <span>${problem.view_count || 0} views</span>
+                                <span>${problem.comment_count || 0} comments</span>
+                            </div>
+
+                            <div style="margin-bottom: 2rem;">
+                                <h2 style="color: var(--danger-color); margin-bottom: 1rem;">❌ Problem</h2>
+                                <p style="white-space: pre-wrap; line-height: 1.8;">${escapeHtml(problem.description)}</p>
+                            </div>
+
+                            <div style="margin-bottom: 2rem;">
+                                <h2 style="color: var(--success-color); margin-bottom: 1rem;">✅ Solution</h2>
+                                <p style="white-space: pre-wrap; line-height: 1.8;">${escapeHtml(problem.solution)}</p>
+                            </div>
+
+                            ${tags ? `<div class="tags" style="margin-top: 1rem;">${tags}</div>` : ''}
+                        </div>
+                    `;
+
+                    // Load comments
+                    loadComments(data.comments || []);
+                } else {
+                    document.getElementById('problemContainer').innerHTML = `
+                        <div class="alert alert-error">Problem not found</div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading problem:', error);
+                document.getElementById('problemContainer').innerHTML = `
+                    <div class="alert alert-error">Failed to load problem details</div>
+                `;
+            }
+        }
+
+        // Load comments
+        function loadComments(comments) {
+            const container = document.getElementById('commentsContainer');
+
+            if (comments.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">No comments yet. Be the first to comment!</p>';
+            } else {
+                container.innerHTML = comments.map(comment => `
+                    <div style="background-color: var(--bg-secondary); padding: 1.5rem; border-radius: 0.5rem; border: 1px solid var(--border-color); margin-bottom: 1rem;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <strong>${escapeHtml(comment.full_name || comment.username)}</strong>
+                            <span style="color: var(--text-secondary); font-size: 0.875rem;">${formatDate(comment.created_at)}</span>
+                        </div>
+                        <p style="white-space: pre-wrap;">${escapeHtml(comment.content)}</p>
+                    </div>
+                `).join('');
+            }
+
+            // Show comment form if authenticated
+            if (API.isAuthenticated()) {
+                document.getElementById('commentForm').style.display = 'block';
+                document.getElementById('loginPrompt').style.display = 'none';
+            } else {
+                document.getElementById('commentForm').style.display = 'none';
+                document.getElementById('loginPrompt').style.display = 'block';
+            }
+        }
+
+        // Submit comment
+        document.getElementById('submitComment').addEventListener('click', async () => {
+            const content = document.getElementById('commentContent').value.trim();
+
+            if (!content) {
+                showAlert('Please enter a comment', 'error');
+                return;
+            }
+
+            try {
+                const data = await API.addComment(problemId, content);
+
+                if (data.success) {
+                    showAlert('Comment posted successfully!', 'success');
+                    document.getElementById('commentContent').value = '';
+                    // Reload problem to get updated comments
+                    setTimeout(() => {
+                        loadProblem();
+                    }, 500);
+                } else {
+                    showAlert(data.message || 'Failed to post comment', 'error');
+                }
+            } catch (error) {
+                showAlert(error.message || 'Failed to post comment', 'error');
+            }
+        });
+
+        // Initialize
+        loadProblem();
+    </script>
+</body>
+</html>

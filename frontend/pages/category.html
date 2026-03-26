@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Category - Problem Solving Platform</title>
+    <link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <nav class="navbar">
+                <a href="/" class="logo">💡 Problem Solver</a>
+                <ul class="nav-links" id="authLinks"></ul>
+                <button class="theme-toggle" id="themeToggle">🌙</button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        <div style="margin: 2rem 0;">
+            <h1 id="categoryTitle">Loading...</h1>
+            <p style="color: var(--text-secondary);" id="categoryDescription"></p>
+        </div>
+
+        <div class="search-box" style="margin-bottom: 2rem;">
+            <input
+                type="text"
+                id="searchInput"
+                class="search-input"
+                placeholder="Search in this category..."
+            >
+            <button class="btn btn-primary" id="searchBtn">Search</button>
+        </div>
+
+        <div class="problem-list" id="problemList">
+            <div class="loading"><div class="spinner"></div></div>
+        </div>
+
+        <div style="text-align: center; margin: 2rem 0;">
+            <button class="btn btn-secondary" id="loadMoreBtn">Load More</button>
+        </div>
+    </main>
+
+    <script src="/js/theme.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/utils.js"></script>
+    <script>
+        // Theme toggle
+        document.getElementById('themeToggle').addEventListener('click', () => {
+            themeManager.toggle();
+        });
+
+        // Get category from URL
+        const pathParts = window.location.pathname.split('/');
+        const categoryId = pathParts[pathParts.length - 1];
+        const urlParams = new URLSearchParams(window.location.search);
+        const searchQuery = urlParams.get('search');
+
+        let currentPage = 1;
+
+        // Load problems
+        async function loadProblems(append = false) {
+            try {
+                const container = document.getElementById('problemList');
+                if (!append) {
+                    showLoading('problemList');
+                }
+
+                let data;
+                if (searchQuery) {
+                    data = await API.searchProblems(searchQuery, categoryId !== 'all' ? categoryId : '', currentPage);
+                    document.getElementById('categoryTitle').textContent = `Search Results for "${searchQuery}"`;
+                    document.getElementById('categoryDescription').textContent = `Found ${data.count || 0} results`;
+                } else if (categoryId === 'all') {
+                    data = await API.getProblems(currentPage);
+                    document.getElementById('categoryTitle').textContent = 'All Problems';
+                    document.getElementById('categoryDescription').textContent = 'Browse all problems and solutions';
+                } else {
+                    data = await API.getProblemsByCategory(categoryId, currentPage);
+                    // Format category title
+                    const title = categoryId.split('-').map(word =>
+                        word.charAt(0).toUpperCase() + word.slice(1)
+                    ).join(' ');
+                    document.getElementById('categoryTitle').textContent = `${title} Problems`;
+                    document.getElementById('categoryDescription').textContent = `Browse ${title.toLowerCase()} related problems and solutions`;
+                }
+
+                if (data.success && data.problems) {
+                    const html = data.problems.map(createProblemCard).join('');
+
+                    if (append) {
+                        container.innerHTML += html;
+                    } else {
+                        container.innerHTML = html;
+                    }
+
+                    if (data.problems.length === 0 && !append) {
+                        container.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">No problems found in this category</p>';
+                    }
+                } else {
+                    container.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">No problems found</p>';
+                }
+            } catch (error) {
+                console.error('Error loading problems:', error);
+                showAlert('Failed to load problems', 'error');
+            }
+        }
+
+        // Search in category
+        function performSearch() {
+            const query = document.getElementById('searchInput').value.trim();
+            if (query) {
+                window.location.href = `/category/${categoryId}?search=${encodeURIComponent(query)}`;
+            } else {
+                window.location.href = `/category/${categoryId}`;
+            }
+        }
+
+        document.getElementById('searchBtn').addEventListener('click', performSearch);
+        document.getElementById('searchInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                performSearch();
+            }
+        });
+
+        // Set search input value if searching
+        if (searchQuery) {
+            document.getElementById('searchInput').value = searchQuery;
+        }
+
+        // Load more
+        document.getElementById('loadMoreBtn').addEventListener('click', () => {
+            currentPage++;
+            loadProblems(true);
+        });
+
+        // Initialize
+        loadProblems();
+    </script>
+</body>
+</html>

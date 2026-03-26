@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Problem Solving Platform - Home</title>
+    <link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <nav class="navbar">
+                <a href="/" class="logo">💡 Problem Solver</a>
+                <ul class="nav-links" id="authLinks">
+                    <li><a href="/login">Login</a></li>
+                    <li><a href="/signup">Sign Up</a></li>
+                </ul>
+                <button class="theme-toggle" id="themeToggle">🌙</button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        <section class="search-container">
+            <h1>Find Solutions to Your Technical Problems</h1>
+            <p style="color: var(--text-secondary); margin: 1rem 0;">
+                Search through thousands of real-world problems and their solutions shared by the community
+            </p>
+            <div class="search-box">
+                <input
+                    type="text"
+                    id="searchInput"
+                    class="search-input"
+                    placeholder="Search for problems, solutions, or keywords..."
+                >
+                <button class="btn btn-primary" id="searchBtn">Search</button>
+            </div>
+        </section>
+
+        <section>
+            <h2>Browse by Category</h2>
+            <div class="categories" id="categoriesContainer">
+                <div class="loading"><div class="spinner"></div></div>
+            </div>
+        </section>
+
+        <section>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2>Trending Problems</h2>
+                <select id="filterSelect" class="form-select" style="width: auto;">
+                    <option value="trending">Trending</option>
+                    <option value="recent">Most Recent</option>
+                </select>
+            </div>
+            <div class="problem-list" id="problemList">
+                <div class="loading"><div class="spinner"></div></div>
+            </div>
+            <div style="text-align: center; margin: 2rem 0;">
+                <button class="btn btn-secondary" id="loadMoreBtn">Load More</button>
+            </div>
+        </section>
+    </main>
+
+    <script src="/js/theme.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/utils.js"></script>
+    <script>
+        let currentPage = 1;
+        let currentFilter = 'trending';
+
+        // Theme toggle
+        document.getElementById('themeToggle').addEventListener('click', () => {
+            themeManager.toggle();
+        });
+
+        // Load categories
+        async function loadCategories() {
+            try {
+                const data = await API.getCategories();
+                const container = document.getElementById('categoriesContainer');
+
+                if (data.success && data.categories) {
+                    container.innerHTML = data.categories.map(createCategoryCard).join('');
+                }
+            } catch (error) {
+                console.error('Error loading categories:', error);
+                showAlert('Failed to load categories', 'error');
+            }
+        }
+
+        // Load problems
+        async function loadProblems(append = false) {
+            try {
+                const container = document.getElementById('problemList');
+                if (!append) {
+                    showLoading('problemList');
+                }
+
+                let data;
+                if (currentFilter === 'trending') {
+                    data = await API.getTrendingProblems(20);
+                } else {
+                    data = await API.getProblems(currentPage);
+                }
+
+                if (data.success && data.problems) {
+                    const html = data.problems.map(createProblemCard).join('');
+
+                    if (append) {
+                        container.innerHTML += html;
+                    } else {
+                        container.innerHTML = html;
+                    }
+
+                    if (data.problems.length === 0 && !append) {
+                        container.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">No problems found</p>';
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading problems:', error);
+                showAlert('Failed to load problems', 'error');
+            }
+        }
+
+        // Search
+        function performSearch() {
+            const query = document.getElementById('searchInput').value.trim();
+            if (query) {
+                window.location.href = `/category/all?search=${encodeURIComponent(query)}`;
+            }
+        }
+
+        document.getElementById('searchBtn').addEventListener('click', performSearch);
+        document.getElementById('searchInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                performSearch();
+            }
+        });
+
+        // Filter change
+        document.getElementById('filterSelect').addEventListener('change', (e) => {
+            currentFilter = e.target.value;
+            currentPage = 1;
+            loadProblems();
+        });
+
+        // Load more
+        document.getElementById('loadMoreBtn').addEventListener('click', () => {
+            if (currentFilter === 'recent') {
+                currentPage++;
+                loadProblems(true);
+            } else {
+                showAlert('Load more is only available for "Most Recent" filter', 'info');
+            }
+        });
+
+        // Initialize
+        loadCategories();
+        loadProblems();
+    </script>
+</body>
+</html>

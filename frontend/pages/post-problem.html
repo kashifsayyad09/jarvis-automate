@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Post a Problem - Problem Solving Platform</title>
+    <link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <nav class="navbar">
+                <a href="/" class="logo">💡 Problem Solver</a>
+                <ul class="nav-links" id="authLinks"></ul>
+                <button class="theme-toggle" id="themeToggle">🌙</button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container" style="max-width: 800px; margin-top: 2rem;">
+        <h1>Share Your Problem & Solution</h1>
+        <p style="color: var(--text-secondary); margin-bottom: 2rem;">
+            Help others by sharing a problem you faced and how you solved it
+        </p>
+
+        <div id="alertContainer"></div>
+
+        <form id="problemForm" style="background-color: var(--bg-secondary); padding: 2rem; border-radius: 0.5rem; border: 1px solid var(--border-color);">
+            <div class="form-group">
+                <label class="form-label" for="title">Problem Title *</label>
+                <input
+                    type="text"
+                    id="title"
+                    class="form-input"
+                    placeholder="Brief, descriptive title of the problem"
+                    required
+                >
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="category">Category *</label>
+                <select id="category" class="form-select" required>
+                    <option value="">Select a category</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="description">Problem Description *</label>
+                <textarea
+                    id="description"
+                    class="form-textarea"
+                    placeholder="Describe the problem in detail. What went wrong? What were the symptoms?"
+                    style="min-height: 150px;"
+                    required
+                ></textarea>
+                <small style="color: var(--text-secondary);">Minimum 50 characters</small>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="solution">Solution *</label>
+                <textarea
+                    id="solution"
+                    class="form-textarea"
+                    placeholder="Explain how you solved the problem. Include steps, code snippets, or configuration changes."
+                    style="min-height: 150px;"
+                    required
+                ></textarea>
+                <small style="color: var(--text-secondary);">Minimum 20 characters</small>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="tags">Tags (comma-separated)</label>
+                <input
+                    type="text"
+                    id="tags"
+                    class="form-input"
+                    placeholder="e.g., nodejs, mysql, authentication, bug-fix"
+                >
+                <small style="color: var(--text-secondary);">Add relevant tags to help others find your solution</small>
+            </div>
+
+            <div style="display: flex; gap: 1rem;">
+                <button type="submit" class="btn btn-primary">Post Problem</button>
+                <a href="/" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </main>
+
+    <script src="/js/theme.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/utils.js"></script>
+    <script>
+        // Check authentication
+        if (!checkAuth()) {
+            // Redirect handled by checkAuth
+        }
+
+        // Theme toggle
+        document.getElementById('themeToggle').addEventListener('click', () => {
+            themeManager.toggle();
+        });
+
+        // Load categories
+        async function loadCategories() {
+            try {
+                const data = await API.getCategories();
+                const select = document.getElementById('category');
+
+                if (data.success && data.categories) {
+                    data.categories.forEach(cat => {
+                        const option = document.createElement('option');
+                        option.value = cat.id;
+                        option.textContent = cat.name;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading categories:', error);
+            }
+        }
+
+        // Handle form submission
+        document.getElementById('problemForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const title = document.getElementById('title').value.trim();
+            const category = document.getElementById('category').value;
+            const description = document.getElementById('description').value.trim();
+            const solution = document.getElementById('solution').value.trim();
+            const tagsInput = document.getElementById('tags').value.trim();
+            const tags = tagsInput ? tagsInput.split(',').map(t => t.trim()).filter(t => t) : [];
+
+            // Validation
+            if (title.length < 10) {
+                showAlert('Title must be at least 10 characters', 'error');
+                return;
+            }
+
+            if (!category) {
+                showAlert('Please select a category', 'error');
+                return;
+            }
+
+            if (description.length < 50) {
+                showAlert('Description must be at least 50 characters', 'error');
+                return;
+            }
+
+            if (solution.length < 20) {
+                showAlert('Solution must be at least 20 characters', 'error');
+                return;
+            }
+
+            try {
+                const data = await API.createProblem({
+                    title,
+                    category,
+                    description,
+                    solution,
+                    tags
+                });
+
+                if (data.success) {
+                    showAlert('Problem posted successfully!', 'success');
+                    setTimeout(() => {
+                        window.location.href = `/problem/${data.problemId}`;
+                    }, 1000);
+                } else {
+                    showAlert(data.message || 'Failed to post problem', 'error');
+                }
+            } catch (error) {
+                showAlert(error.message || 'Failed to post problem. Please try again.', 'error');
+            }
+        });
+
+        // Initialize
+        loadCategories();
+    </script>
+</body>
+</html>
